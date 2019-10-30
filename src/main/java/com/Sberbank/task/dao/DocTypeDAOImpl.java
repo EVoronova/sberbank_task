@@ -8,8 +8,8 @@ import javax.persistence.Persistence;
 
 public class DocTypeDAOImpl implements DocTypeDAO {
     public void createDocType(DocType docType) {
-        EntityManagerFactory ENTITY_MANAGER_FACTORY = Persistence.createEntityManagerFactory("examplePU");
-        EntityManager em = ENTITY_MANAGER_FACTORY.createEntityManager();
+        EntityManagerFactory emf = Persistence.createEntityManagerFactory("examplePU");
+        EntityManager em = emf.createEntityManager();
         try {
             em.getTransaction().begin();
             em.persist(docType);
@@ -18,6 +18,7 @@ public class DocTypeDAOImpl implements DocTypeDAO {
             System.out.println(e.getMessage());
         }finally {
             em.close();
+            emf.close();
         }
     }
 }

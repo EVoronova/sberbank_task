@@ -2,51 +2,69 @@ package com.Sberbank.task;
 
 import com.Sberbank.task.entities.DocType;
 import com.Sberbank.task.service.DocTypeServiceImpl;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamConstants;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import java.io.FileInputStream;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.*;
+import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.w3c.dom.Document;
+
 public class main {
-    private static Set<DocType> docTypeSet = new TreeSet<>((DocType o1, DocType o2) -> o1.getName().compareTo(o2.getName()));
+    private static Set<DocType> docTypeSet = new TreeSet<>(Comparator.comparing(DocType::getName));
 
-    public static void main(String[] args) throws IOException, XMLStreamException {
+    public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException, XPathExpressionException {
 
-        String fileName = "sber.xml";
-        XMLInputFactory xmlInputFactory = XMLInputFactory.newInstance();
-        XMLStreamReader r = xmlInputFactory.createXMLStreamReader(new FileInputStream(fileName));
+        File docFile = new File("sber.xml");
 
-        try {
-            int event = r.getEventType();
-            while (true) {
-                switch (event) {
-                    case XMLStreamConstants.START_ELEMENT:
-                        if (r.getLocalName().equals("par") && r.getAttributeCount() > 1) {
-                            if (r.getAttributeValue(1).equals("ГРАЖДАНСТВО")) {
-                                for (int i = 0, n = r.getAttributeCount(); i < n; ++i)
-                                    System.out.println("Attribute: " + r.getAttributeName(i)
-                                            + "=" + r.getAttributeValue(i));
-                            }
-                        } else if (r.getLocalName().equals("par_list")) {
-                                DocType docType = new DocType(r.getAttributeValue(0));
-                                new DocTypeServiceImpl().createDocType(docType);
-                                docTypeSet.add(docType);
-                        }
-                        break;
-                }
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        DocumentBuilder db = dbf.newDocumentBuilder();
+        Document doc = db.parse(docFile);
 
-                if (!r.hasNext())
-                    break;
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
 
-                event = r.next();
+        createDocTableInDB(doc,xpath);
+
+        printAttributes(doc,xpath);
+
+    }
+
+    private static void createDocTableInDB(Document doc, XPath xPath) throws XPathExpressionException {
+        XPathExpression expr = xPath.compile("/order/services/serv/pars/par[@name='ВИД_ДОК']");
+
+        NodeList nl = (NodeList) expr.evaluate(doc, XPathConstants.NODESET);
+        NodeList docTypeNodeList = nl.item(0).getChildNodes();
+
+        for (int x = 0; x < docTypeNodeList.getLength(); x++) {
+            NamedNodeMap attributes = docTypeNodeList.item(x).getAttributes();
+            if (attributes != null) {
+                String value = docTypeNodeList.item(x).getAttributes().item(0).getNodeValue();
+                DocType docType = new DocType(value);
+                new DocTypeServiceImpl().createDocType(docType);
+                docTypeSet.add(docType);
             }
-        } finally {
-            r.close();
+        }
+    }
+
+    private static void printAttributes(Document doc, XPath xPath) throws XPathExpressionException {
+        XPathExpression expr2 = xPath.compile("/order/services/serv/pars/par[@name='ГРАЖДАНСТВО']");
+
+        NodeList n2 = (NodeList) expr2.evaluate(doc, XPathConstants.NODESET);
+        NamedNodeMap attributesList = n2.item(0).getAttributes();
+
+        for (int x = 0; x < attributesList.getLength(); x++) {
+            System.out.println("Attribute: " + attributesList.item(x).getNodeName()
+                    + "=" + attributesList.item(x).getNodeValue());
         }
     }
 }
